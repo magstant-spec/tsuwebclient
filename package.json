@@ -1,0 +1,19 @@
+﻿{
+  "name": "browser-mud-gmcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser MUD terminal with GMCP via WebSocket proxy",
+  "main": "server.js",
+  "scripts": {
+    "prepare:assets": "node scripts/prepare-assets.js",
+    "start": "node server.js",
+    "postinstall": "npm run prepare:assets"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "xterm": "^5.3.0",
+    "ws": "^8.18.0"
+  }
+}

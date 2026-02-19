@@ -1,0 +1,372 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Browser MUD GMCP Client</title>
+  <link rel="stylesheet" href="/vendor/xterm/xterm.css" />
+  <style>
+    :root {
+      --bg: #0b0f18;
+      --panel: #141c2b;
+      --panel-2: #0f1624;
+      --line: rgba(148, 163, 184, 0.18);
+      --text: #d6e2f2;
+      --muted: #93a4bc;
+      --ok: #4ade80;
+      --accent: #7aa2ff;
+      --accent-2: #38bdf8;
+      --glow: rgba(122, 162, 255, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(900px 600px at 20% 10%, rgba(56, 189, 248, 0.12), transparent 60%),
+        radial-gradient(900px 600px at 80% 0%, rgba(122, 162, 255, 0.12), transparent 60%),
+        radial-gradient(1400px 900px at 50% 120%, rgba(15, 23, 42, 0.6), transparent 70%),
+        linear-gradient(180deg, #0a0f1a 0%, #0b0f18 60%, #0a0e17 100%);
+      color: var(--text);
+      font: 15px/1.45 "JetBrains Mono", "Fira Code", Consolas, Monaco, monospace;
+      min-height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(20, 28, 43, 0.96), rgba(12, 18, 30, 0.96));
+      box-shadow: 0 8px 18px rgba(7, 12, 20, 0.4);
+      flex-wrap: wrap;
+    }
+
+    input, button {
+      background: rgba(11, 18, 32, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 6px;
+      font: inherit;
+    }
+
+    input { min-width: 120px; }
+
+    button {
+      cursor: pointer;
+      transition: 120ms ease;
+    }
+
+    button:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(122, 162, 255, 0.15);
+    }
+
+    .status {
+      margin-left: auto;
+      color: var(--muted);
+      max-width: 45vw;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      min-height: 0;
+      height: 100%;
+    }
+
+    .side {
+      display: none;
+    }
+
+    .hud-card {
+      position: fixed;
+      z-index: 20;
+      background: linear-gradient(180deg, rgba(20, 28, 43, 0.9), rgba(12, 18, 30, 0.92));
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      padding: 8px 10px;
+      border-radius: 10px;
+      min-width: 200px;
+      min-height: 120px;
+      max-width: none;
+      box-shadow: 0 10px 30px rgba(5, 8, 14, 0.5), inset 0 1px 0 rgba(255,255,255,0.06);
+      cursor: move;
+      user-select: none;
+      pointer-events: auto;
+      resize: both;
+      overflow: auto;
+      scrollbar-width: none;
+      backdrop-filter: blur(10px);
+    }
+
+    .hud-card::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+
+    .hud-resize-x,
+    .hud-resize-y {
+      position: absolute;
+      z-index: 5;
+      background: transparent;
+    }
+
+    .hud-resize-x {
+      top: 0;
+      right: -4px;
+      width: 8px;
+      height: 100%;
+      cursor: ew-resize;
+    }
+
+    .hud-resize-y {
+      left: 0;
+      bottom: -4px;
+      width: 100%;
+      height: 8px;
+      cursor: ns-resize;
+    }
+
+    .hud-handle {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 18px;
+      cursor: move;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0));
+    }
+
+    .hud-label {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .hud-value {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      font-variant-numeric: tabular-nums;
+      color: #e6f1ff;
+      margin-top: 2px;
+      font-size: 14px;
+    }
+
+    .hud-bar {
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.7);
+      overflow: hidden;
+      margin-top: 6px;
+    }
+
+    .hud-bar > span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #34d399, #60a5fa);
+      transition: width 180ms ease;
+    }
+
+    .hud-bar.hp > span {
+      background: linear-gradient(90deg, #f85149, #f0883e);
+    }
+
+    .hud-bar.sp > span {
+      background: linear-gradient(90deg, #58a6ff, #1f6feb);
+    }
+
+    #terminal {
+      width: 100%;
+      height: 100%;
+      padding: 10px 12px;
+      min-height: 0;
+    }
+
+    #terminal .xterm,
+    #terminal .xterm-viewport,
+    #terminal .xterm-screen {
+      height: 100%;
+    }
+
+    .side {
+      border-left: 1px solid var(--line);
+      background: color-mix(in srgb, var(--panel) 88%, black);
+      overflow: auto;
+      min-height: 0;
+    }
+
+    .box {
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .box h3 {
+      margin: 0 0 8px;
+      font-size: 13px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .panel-content {
+      margin: 0;
+      white-space: normal;
+      color: #cdd9e5;
+      max-height: 100%;
+      overflow: auto;
+      font-size: 13px;
+    }
+
+    .map-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background:
+        radial-gradient(600px 420px at 30% 30%, rgba(56, 189, 248, 0.08), transparent 65%),
+        radial-gradient(600px 420px at 80% 15%, rgba(122, 162, 255, 0.08), transparent 65%),
+        linear-gradient(180deg, #0b1220 0%, #0b1120 100%);
+      border-radius: 6px;
+      box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.1);
+    }
+
+    .panel-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px 12px;
+    }
+
+    .panel-key {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 11px;
+    }
+
+    .panel-value {
+      text-align: right;
+      color: #9ecbff;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .panel-list {
+      display: grid;
+      gap: 6px;
+      color: #9ecbff;
+      word-break: break-word;
+    }
+
+    .bar {
+      height: 6px;
+      border-radius: 999px;
+      background: #1f2a3a;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .bar > span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #3fb950, #58a6ff);
+      width: 0%;
+      transition: width 200ms ease;
+    }
+
+    .footer {
+      border-top: 1px solid var(--line);
+      padding: 6px 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .status {
+        margin-left: 0;
+        width: 100%;
+        max-width: 100%;
+      }
+
+      .hud-card {
+        max-width: 88vw;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="hud-card hud-draggable" data-hud-key="hp" style="left:12px; top:58px;">
+    <div class="hud-label">HP</div>
+    <div class="hud-value">
+      <span id="hudHpValue">0/0</span>
+      <span id="hudHpPct">0%</span>
+    </div>
+    <div class="hud-bar hp"><span id="hudHpBar"></span></div>
+  </div>
+  <div class="hud-card hud-draggable" data-hud-key="sp" style="left:12px; top:140px;">
+    <div class="hud-label">SP</div>
+    <div class="hud-value">
+      <span id="hudSpValue">0/0</span>
+      <span id="hudSpPct">0%</span>
+    </div>
+    <div class="hud-bar sp"><span id="hudSpBar"></span></div>
+  </div>
+  <div class="hud-card hud-draggable" data-hud-key="status" style="left:12px; top:222px;">
+    <div class="hud-label">Char Status</div>
+    <div id="statusPanel" class="panel-content"></div>
+  </div>
+  <div class="hud-card hud-draggable" data-hud-key="vitals" style="left:12px; top:420px;">
+    <div class="hud-label">Vitals</div>
+    <div id="vitals" class="panel-content"></div>
+  </div>
+  <div class="hud-card hud-draggable" data-hud-key="enemy" style="right:12px; top:58px;">
+    <div class="hud-label">Enemy</div>
+    <div id="enemy" class="panel-content"></div>
+  </div>
+  <div class="hud-card hud-draggable" data-hud-key="room" style="right:12px; top:220px;">
+    <div class="hud-label">Room</div>
+    <div id="room" class="panel-content"></div>
+  </div>
+  <div class="hud-card hud-draggable" data-hud-key="area" style="right:12px; top:420px;">
+    <div class="hud-label">Area</div>
+    <div id="area" class="panel-content"></div>
+  </div>
+  <div class="hud-card hud-draggable" data-hud-key="comm" style="right:12px; top:600px;">
+    <div class="hud-label">Communication</div>
+    <div id="communication" class="panel-content"></div>
+  </div>
+  <div class="hud-card hud-draggable" data-hud-key="map" style="left:360px; top:280px;">
+    <div class="hud-label">Map</div>
+    <canvas id="mapCanvas" class="panel-content map-canvas"></canvas>
+  </div>
+  <div class="toolbar">
+    <input id="host" value="www.thebigwave.net" aria-label="MUD host" />
+    <input id="port" value="23" aria-label="MUD port" />
+    <button id="connectBtn">Connect</button>
+    <button id="disconnectBtn">Disconnect</button>
+    <div id="status" class="status">Idle</div>
+  </div>
+
+  <div class="layout">
+    <div id="terminal"></div>
+    <div class="side"></div>
+  </div>
+
+  <div class="footer">Enter sends newline. Ctrl+C sends raw ETX.</div>
+
+  <script src="/vendor/xterm/xterm.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
