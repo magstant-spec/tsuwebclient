@@ -870,9 +870,14 @@
     const scaleY = (height - padding * 2) / (rangeY * grid);
     const scale = Math.max(0.4, Math.min(1.2, Math.min(scaleX, scaleY)));
 
+    const mapWidth = (rangeX - 1) * grid * scale;
+    const mapHeight = (rangeY - 1) * grid * scale;
+    const offsetX = Math.max(padding, (width - mapWidth) / 2);
+    const offsetY = Math.max(padding, (height - mapHeight) / 2);
+
     function toScreen(node) {
-      const x = padding + (node.x - minX) * grid * scale;
-      const y = padding + (node.y - minY) * grid * scale;
+      const x = offsetX + (node.x - minX) * grid * scale;
+      const y = offsetY + (node.y - minY) * grid * scale;
       return { x, y };
     }
 
