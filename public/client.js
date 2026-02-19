@@ -217,8 +217,6 @@
   let lineBuffer = '';
   let replaceMode = false;
   let replaceBuffer = '';
-  let gmcpEnableSent = false;
-  let suppressGmcpEchoUntil = 0;
   const gmcpState = {
     affects: {},
     area: {},
@@ -261,34 +259,6 @@
       return;
     }
     ws.send(JSON.stringify(event));
-  }
-
-  function sendGmcpEnable() {
-    if (gmcpEnableSent) {
-      return;
-    }
-    gmcpEnableSent = true;
-    suppressGmcpEchoUntil = Date.now() + 4000;
-    const modules = [
-      'area',
-      'room',
-      'char',
-      'char.items',
-      'char.vitals',
-      'char.status',
-      'char.skills',
-      'char.statusvars',
-      'enemy',
-      'enemy.vitals',
-      'affects',
-      'communication',
-      'communication.say',
-      'communication.wiz',
-      'communication.chat',
-      'communication.shout',
-      'communication.tells',
-    ];
-    send({ type: 'input', data: `gmcp enable ${modules.join(' ')}\n` });
   }
 
   function normalizeHost(value) {
@@ -1136,15 +1106,11 @@
 
     ws.addEventListener('open', () => {
       setStatus('Connected to proxy');
-      gmcpEnableSent = false;
       send({
         type: 'connect',
         host: normalizeHost(hostInput.value),
         port: Number(portInput.value.trim() || 23),
       });
-      setTimeout(() => {
-        sendGmcpEnable();
-      }, 1500);
     });
 
     ws.addEventListener('message', (e) => {
@@ -1156,16 +1122,7 @@
       }
 
       if (msg.type === 'text') {
-        let text = msg.data;
-        if (suppressGmcpEchoUntil > Date.now()) {
-          text = text.replace(/(^|\r?\n)gmcp enable[^\r\n]*\r?\n?/i, '$1');
-        }
-        if (text) {
-          term.write(text);
-        }
-        if (!gmcpEnableSent) {
-          sendGmcpEnable();
-        }
+        term.write(msg.data);
       } else if (msg.type === 'status') {
         setStatus(msg.message);
       } else if (msg.type === 'disconnect') {
