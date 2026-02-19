@@ -541,28 +541,59 @@
     delete clean.wizlevel;
     delete clean.level;
 
-    const name = clean.name ? escapeHtml(stripColorTags(clean.name)) : 'Unknown';
+    const headerNameRaw = clean.short || clean.name || 'Unknown';
+    const name = escapeHtml(stripColorTags(headerNameRaw));
     const className = clean.class ? titleize(clean.class) : '';
     const subClass = clean.subclass ? titleize(clean.subclass) : '';
     const race = clean.race ? titleize(clean.race) : '';
     const lineage = [className, subClass, race].filter(Boolean).join(' · ');
 
-    const levelParts = [];
-    if (clean.currentlevel !== undefined) {
-      levelParts.push(`Level ${formatNumber(clean.currentlevel)}`);
-    }
-    if (clean.herolevel !== undefined) {
-      levelParts.push(`Hero ${formatNumber(clean.herolevel)}`);
-    }
-    if (clean.expfract !== undefined) {
-      const expPct = formatPercent(clean.expfract);
-      if (expPct !== null) {
-        levelParts.push(`Exp ${expPct}`);
+    function formatHeroFrac(hero, fract) {
+      if (hero === undefined || hero === null) {
+        return null;
       }
+      const heroNum = Number(hero);
+      const fracNum = Number(fract);
+      if (!Number.isFinite(heroNum)) {
+        return String(hero);
+      }
+      if (!Number.isFinite(fracNum)) {
+        return formatNumber(heroNum);
+      }
+      const fracPct = fracNum <= 1 ? Math.round(fracNum * 100) : Math.round(fracNum);
+      const fracText = String(Math.max(0, Math.min(99, fracPct))).padStart(2, '0');
+      return `${formatNumber(heroNum)}.${fracText}`;
     }
+
+    const levelParts = [];
+    const currentLevel = clean.currentlevel;
+    const heroFract = formatHeroFrac(clean.herolevel, clean.expfract);
+    if (currentLevel !== undefined || heroFract) {
+      const left = currentLevel !== undefined ? formatNumber(currentLevel) : '0';
+      const right = heroFract ? `+${heroFract}` : '';
+      levelParts.push(`Level ${left}${right}`);
+    }
+    if (clean.exptolevel !== undefined) {
+      levelParts.push(`To Level ${formatNumber(clean.exptolevel)}`);
+    }
+
     delete clean.currentlevel;
     delete clean.herolevel;
     delete clean.expfract;
+    delete clean.exptolevel;
+    delete clean.currentexp;
+    delete clean.expforlevel;
+    delete clean.exp_hour;
+    delete clean.exp_min;
+    delete clean.totallevel;
+    delete clean.damage_taken;
+    delete clean.damage_round;
+    delete clean.intoxicated;
+    delete clean.name;
+    delete clean.short;
+    delete clean.class;
+    delete clean.subclass;
+    delete clean.race;
 
     const detailsKeys = [
       'clan',
@@ -575,8 +606,6 @@
       'gold',
       'gold_bank',
       'gold_house',
-      'currentexp',
-      'exptolevel',
     ];
 
     const details = {};
