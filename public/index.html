@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Browser MUD GMCP Client</title>
+  <title>Tsunami MUD Web Client</title>
   <link rel="stylesheet" href="/vendor/xterm/xterm.css" />
   <style>
     :root {
@@ -35,8 +35,122 @@
       color: var(--text);
       font: 15px/1.45 "JetBrains Mono", "Fira Code", Consolas, Monaco, monospace;
       min-height: 100%;
+      display: block;
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      padding: 12px;
+      background: rgba(9, 15, 25, 0.9);
+      border-right: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
+    .sidebar .wave-image {
+      width: 100%;
+      max-width: 220px;
+      height: auto;
+      display: block;
+      margin: 0 auto 12px;
+    }
+
+    /* Main menu styles (mimic) */
+    ul#menu {
+      margin: 0;
+      padding: 10px;
+      list-style: none;
+      background-color: #1b3a4b;
+      border: 2px solid #6ccff6;
+      border-radius: 10px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+      position: relative;
+      top: 0;
+      width: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    ul#menu li {
+      margin: 5px 0;
+      padding: 5px;
+      border: 1px solid #6ccff6;
+      border-radius: 5px;
+      background: linear-gradient(145deg, #2c5771, #163a4c);
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+      transition: background 0.3s, transform 0.3s;
+      width: 90%;
+      text-align: center;
+      position: relative;
+    }
+
+    ul#menu li:hover {
+      background: linear-gradient(145deg, #3a7ba9, #1b4e6d);
+      transform: scale(1.02);
+    }
+
+    ul#menu li a {
+      color: #ffffff;
+      text-decoration: none;
+      display: block;
+      padding: 5px;
+      font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+      font-size: 12px;
+    }
+
+    ul#menu li ul {
+      display: none;
+      padding: 0;
+      list-style: none;
+      background-color: transparent;
+      border: 0px solid #6ccff6;
+      position: absolute;
+      top: 120%;
+      left: 50%;
+      transform: translateX(30%);
+      z-index: 1000;
+      min-width: 150px;
+      text-align: center;
+    }
+
+    ul#menu li:hover > ul {
+      display: block;
+    }
+
+    ul#menu li ul li {
+      padding: 5px;
+      border-bottom: 1px solid #6ccff6;
+      text-align: center;
+    }
+
+    ul#menu li ul li:hover {
+      background: linear-gradient(145deg, #3a7ba9, #1b4e6d);
+      transform: scale(1.02);
+    }
+
+    ul#menu li ul li a {
+      color: #ffffff;
+      font-size: 12px;
+      padding: 5px;
+    }
+
+    .sidebar iframe {
+      width: 100%;
+      height: 380px;
+      border: 0;
+      margin-top: 12px;
+      border-radius: 8px;
+    }
+
+    .main {
       display: grid;
       grid-template-rows: auto 1fr auto;
+      min-height: 100vh;
     }
 
     .toolbar {
@@ -360,6 +474,20 @@
     }
 
     @media (max-width: 900px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        order: 2;
+        border-right: 0;
+        border-top: 1px solid rgba(148, 163, 184, 0.2);
+      }
+
+      .main {
+        order: 1;
+      }
+
       .status {
         margin-left: 0;
         width: 100%;
@@ -373,11 +501,11 @@
   </style>
 </head>
 <body>
-  <div class="hud-card hud-draggable" data-hud-key="status" style="left:12px; top:222px;">
+  <div class="hud-card hud-draggable" data-hud-key="status" style="left:260px; top:222px;">
     <div class="hud-label">Char Status</div>
     <div id="statusPanel" class="panel-content"></div>
   </div>
-  <div class="hud-card hud-draggable" data-hud-key="vitals" style="left:12px; top:420px;">
+  <div class="hud-card hud-draggable" data-hud-key="vitals" style="left:260px; top:420px;">
     <div class="hud-label">Vitals</div>
     <div id="vitals" class="panel-content"></div>
   </div>
@@ -397,24 +525,66 @@
     <div class="hud-label">Communication</div>
     <div id="communication" class="panel-content"></div>
   </div>
-  <div class="hud-card hud-draggable" data-hud-key="map" style="left:360px; top:280px;">
+  <div class="hud-card hud-draggable" data-hud-key="map" style="left:520px; top:280px;">
     <div class="hud-label">Map</div>
     <canvas id="mapCanvas" class="panel-content map-canvas"></canvas>
   </div>
-  <div class="toolbar">
-    <input id="host" value="www.thebigwave.net" aria-label="MUD host" />
-    <input id="port" value="23" aria-label="MUD port" />
-    <button id="connectBtn">Connect</button>
-    <button id="disconnectBtn">Disconnect</button>
-    <div id="status" class="status">Idle</div>
-  </div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <img src="https://i.imgur.com/5hoat55.png" class="wave-image" alt="Wave Image">
+      <ul id="menu">
+        <li><a href="https://tsuwebclient.fly.dev/" target="_blank">Play Now!</a></li>
+        <li class="submenu"><a href="https://www.thebigwave.net/index.php" target="_blank">Home</a>
+          <ul>
+            <li><a href="https://www.thebigwave.net/" target="_blank">Home</a></li>
+            <li><a href="https://www.thebigwave.net/history.php" target="_blank">History</a></li>
+            <li><a href="https://www.thebigwave.net/who.php" target="_blank">Who's Online?</a></li>
+            <li><a href="https://www.thebigwave.net/board.php" target="_blank">Tsunami Boards</a></li>
+            <li><a href="https://www.thebigwave.net/averages.php" target="_blank">Login Statistics</a></li>
+            <li><a href="https://www.thebigwave.net/wizards.php" target="_blank">Wizards</a></li>
+            <li><a href="https://www.thebigwave.net/toplists.php" target="_blank">Top Lists</a></li>
+          </ul>
+        </li>
+        <li class="submenu"><a>Account Menu</a>
+          <ul>
+            <li><a href="https://www.thebigwave.net/account/login.php" target="_blank">My Account</a></li>
+            <li><a href="https://www.thebigwave.net/account/create.php" target="_blank">Create An Account</a></li>
+          </ul>
+        </li>
+        <li><a href="https://www.thebigwave.net/wiki/" target="_blank">Tsunami Wiki</a></li>
+        <li><a href="https://www.thebigwave.net/newplayerguide.php" target="_blank">New Player Guide</a></li>
+        <li class="submenu"><a>Maps</a>
+          <ul>
+            <li><a href="https://www.thebigwave.net/map.php" target="_blank">Map of the World</a></li>
+            <li><a href="https://www.thebigwave.net/fieldmap.php" target="_blank">Field War Map</a></li>
+            <li><a href="https://www.thebigwave.net/mapwar.php" target="_blank">Map War Maps</a></li>
+          </ul>
+        </li>
+        <li><a href="https://www.thebigwave.net/rss/changesboard.php" target="_blank">Change Board RSS</a></li>
+        <li><a href="https://www.facebook.com/TsunamiTheBigWave/" target="_blank"><img style="width: 100px;" src="https://www.thebigwave.net/facebook.png" alt="Find us on Facebook"></a></li>
+        <li><a class="patreon" href="https://www.patreon.com/thebigwave" target="_blank"><img style="width: 100px;" border="0" src="https://images.squarespace-cdn.com/content/v1/5d88f1f13db677155dee50fa/1569433169917-BT808IH5PRNAB72ZLESX/wordmark_on_navy.jpg" alt="Become a Patreon!"></a></li>
+        <li><a class="topmud" href="https://www.mudverse.com/vote/591" target="_blank"><img style="width: 100px;" border="0" src="https://www.mudverse.com/images/mudverse-smalllogo.png" alt="Mudverse"></a></li>
+      </ul>
+      <iframe src="https://discordapp.com/widget?id=490093039415590923&theme=dark" allowtransparency="true" frameborder="0"></iframe>
+    </aside>
 
-  <div class="layout">
-    <div id="terminal"></div>
-    <div class="side"></div>
-  </div>
+    <main class="main">
+      <div class="toolbar">
+        <input id="host" value="www.thebigwave.net" aria-label="MUD host" />
+        <input id="port" value="23" aria-label="MUD port" />
+        <button id="connectBtn">Connect</button>
+        <button id="disconnectBtn">Disconnect</button>
+        <div id="status" class="status">Idle</div>
+      </div>
 
-  <div class="footer">Enter sends newline. Ctrl+C sends raw ETX.</div>
+      <div class="layout">
+        <div id="terminal"></div>
+        <div class="side"></div>
+      </div>
+
+      <div class="footer">Enter sends newline. Ctrl+C sends raw ETX.</div>
+    </main>
+  </div>
 
   <script src="/vendor/xterm/xterm.js"></script>
   <script src="client.js"></script>
