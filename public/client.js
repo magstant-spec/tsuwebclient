@@ -398,57 +398,50 @@
     return `<div class="panel-list">${items.join('')}</div>`;
   }
 
-  function renderVitals(vitals) {
+  function renderVitals(vitals, opts = {}) {
     if (!vitals || typeof vitals !== 'object') {
       return '<div class="panel-list">(no data)</div>';
     }
     const rows = [];
-    const pairs = [
-      ['hp', 'max_hp'],
-      ['mana', 'max_mana'],
-      ['sp', 'max_sp'],
-      ['stamina', 'max_stamina'],
-      ['moves', 'max_moves'],
-      ['hp', 'hp_max'],
-      ['mana', 'mana_max'],
-      ['sp', 'sp_max'],
-      ['stamina', 'stamina_max'],
-      ['moves', 'moves_max'],
-      ['hp', 'maxhp'],
-      ['mana', 'maxmana'],
-      ['sp', 'maxsp'],
-      ['stamina', 'maxstamina'],
-      ['moves', 'maxmoves'],
-    ];
-    for (const [curKey, maxKey] of pairs) {
-      if (vitals[curKey] === undefined && vitals[maxKey] === undefined) {
-        continue;
-      }
-      const current = Number(vitals[curKey] ?? 0);
-      const max = Number(vitals[maxKey] ?? 0);
+
+    const hpCur = vitals.hp ?? vitals.HP;
+    const hpMax = vitals.max_hp ?? vitals.hp_max ?? vitals.maxhp;
+    if (hpCur !== undefined || hpMax !== undefined) {
+      const current = Number(hpCur ?? 0);
+      const max = Number(hpMax ?? 0);
       const pct = max > 0 ? Math.max(0, Math.min(100, Math.round((current / max) * 100))) : 0;
-      const label = escapeHtml(curKey.toUpperCase());
-      const value = max > 0 ? `${current}/${max}` : `${current}`;
+      const value = max > 0 ? `${formatNumber(current)}/${formatNumber(max)}` : `${formatNumber(current)}`;
       rows.push(
-        `<div class="panel-key">${label}</div>` +
+        `<div class="panel-key">HP</div>` +
         `<div class="panel-value">${escapeHtml(value)}</div>` +
         `<div class="bar" style="grid-column:1 / -1;"><span style="width:${pct}%"></span></div>`
       );
     }
 
-    const extras = Object.entries(vitals)
-      .filter(([key]) => !['hp','max_hp','hp_max','maxhp','mana','max_mana','mana_max','maxmana','sp','max_sp','sp_max','maxsp','stamina','max_stamina','stamina_max','maxstamina','moves','max_moves','moves_max','maxmoves'].includes(key))
-      .reduce((acc, [key, value]) => {
-        acc[key] = value;
-        return acc;
-      }, {});
+    const spCur = vitals.sp ?? vitals.SP;
+    const spMax = vitals.max_sp ?? vitals.sp_max ?? vitals.maxsp;
+    if (spCur !== undefined || spMax !== undefined) {
+      const current = Number(spCur ?? 0);
+      const max = Number(spMax ?? 0);
+      const pct = max > 0 ? Math.max(0, Math.min(100, Math.round((current / max) * 100))) : 0;
+      const value = max > 0 ? `${formatNumber(current)}/${formatNumber(max)}` : `${formatNumber(current)}`;
+      rows.push(
+        `<div class="panel-key">SP</div>` +
+        `<div class="panel-value">${escapeHtml(value)}</div>` +
+        `<div class="bar" style="grid-column:1 / -1;"><span style="width:${pct}%"></span></div>`
+      );
+    }
 
-    if (rows.length === 0) {
-      return renderKeyValues(extras);
+    const extras = {};
+    if (!opts.enemy) {
+      if (vitals.xp !== undefined) extras.xp = vitals.xp;
+      if (vitals.dam !== undefined) extras.dam = vitals.dam;
+      if (vitals.condition !== undefined) extras.condition = vitals.condition;
+    } else {
+      if (vitals.enemy !== undefined) extras.enemy = vitals.enemy;
     }
 
     if (Object.keys(extras).length > 0) {
-      rows.push(`<div class="panel-key">OTHER</div><div class="panel-value"></div>`);
       const extraRows = Object.entries(extras).map(
         ([key, value]) =>
           `<div class="panel-key">${escapeHtml(key.replace(/_/g, ' '))}</div>` +
@@ -457,6 +450,9 @@
       rows.push(...extraRows);
     }
 
+    if (rows.length === 0) {
+      return '<div class="panel-list">(no data)</div>';
+    }
     return `<div class="panel-grid">${rows.join('')}</div>`;
   }
 
@@ -487,24 +483,124 @@
     setHudBar(vitals.sp, spMax, hudSpValue, hudSpPct, hudSpBar);
   }
 
-  function renderStatus(status) {
-    const preferred = [
-      'name', 'class', 'race', 'level', 'alignment', 'deity', 'position', 'state',
-    ];
-    const snapshot = pick(status, preferred);
-    const rest = Object.entries(status || {})
-      .filter(([key]) => !preferred.includes(key))
-      .reduce((acc, [key, value]) => {
-        acc[key] = value;
-        return acc;
-      }, {});
+  function titleize(value) {
+    return String(value)
+      .toLowerCase()
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  }
 
-    const summary = Object.keys(snapshot).length > 0 ? renderKeyValues(snapshot) : '';
-    const extra = Object.keys(rest).length > 0 ? renderKeyValues(rest) : '';
-    if (summary && extra) {
-      return `${summary}<div style="height:8px;"></div>${extra}`;
+  function formatNumber(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) {
+      return String(value);
     }
-    return summary || extra || '<div class="panel-list">(no data)</div>';
+    return num.toLocaleString('en-US');
+  }
+
+  function formatPercent(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) {
+      return null;
+    }
+    const pct = num <= 1 ? num * 100 : num;
+    if (!Number.isFinite(pct)) {
+      return null;
+    }
+    return `${Math.round(pct)}%`;
+  }
+
+  function renderStatusGrid(obj) {
+    if (!obj || typeof obj !== 'object' || Object.keys(obj).length === 0) {
+      return '';
+    }
+    const rows = Object.entries(obj).map(([key, value]) => {
+      const label = escapeHtml(key.replace(/_/g, ' '));
+      let formatted = value;
+      if (typeof value === 'string') {
+        if (['class','subclass','race','gender','clan','position','state','alignment','deity'].includes(key)) {
+          formatted = titleize(value);
+        } else {
+          formatted = stripColorTags(value);
+        }
+      }
+      if (typeof value === 'number' || (typeof value === 'string' && /^-?\d+(\.\d+)?$/.test(value))) {
+        formatted = formatNumber(value);
+      }
+      return `<div class="status-key">${label}</div><div class="status-value">${escapeHtml(String(formatted))}</div>`;
+    });
+    return `<div class="status-grid">${rows.join('')}</div>`;
+  }
+
+  function renderStatus(status) {
+    if (!status || typeof status !== 'object') {
+      return '<div class="panel-list">(no data)</div>';
+    }
+
+    const clean = { ...status };
+    delete clean.wizard;
+    delete clean.wizlevel;
+    delete clean.level;
+
+    const name = clean.name ? escapeHtml(stripColorTags(clean.name)) : 'Unknown';
+    const className = clean.class ? titleize(clean.class) : '';
+    const subClass = clean.subclass ? titleize(clean.subclass) : '';
+    const race = clean.race ? titleize(clean.race) : '';
+    const lineage = [className, subClass, race].filter(Boolean).join(' · ');
+
+    const levelParts = [];
+    if (clean.currentlevel !== undefined) {
+      levelParts.push(`Level ${formatNumber(clean.currentlevel)}`);
+    }
+    if (clean.herolevel !== undefined) {
+      levelParts.push(`Hero ${formatNumber(clean.herolevel)}`);
+    }
+    if (clean.expfract !== undefined) {
+      const expPct = formatPercent(clean.expfract);
+      if (expPct !== null) {
+        levelParts.push(`Exp ${expPct}`);
+      }
+    }
+    delete clean.currentlevel;
+    delete clean.herolevel;
+    delete clean.expfract;
+
+    const detailsKeys = [
+      'clan',
+      'gender',
+      'alignment',
+      'deity',
+      'position',
+      'state',
+      'questpoints',
+      'gold',
+      'gold_bank',
+      'gold_house',
+      'currentexp',
+      'exptolevel',
+    ];
+
+    const details = {};
+    for (const key of detailsKeys) {
+      if (clean[key] !== undefined) {
+        details[key] = clean[key];
+        delete clean[key];
+      }
+    }
+
+    const extra = Object.keys(clean).length > 0 ? clean : null;
+
+    const detailRows = renderStatusGrid(details);
+    const extraRows = extra ? renderStatusGrid(extra) : '';
+
+    return `
+      <div class="status-header">
+        <div class="status-name">${name}</div>
+        ${lineage ? `<div class="status-sub">${escapeHtml(lineage)}</div>` : ''}
+      </div>
+      ${levelParts.length ? `<div class="status-line">${escapeHtml(levelParts.join(' · '))}</div>` : ''}
+      ${detailRows}
+      ${extraRows ? `<div class="status-divider"></div>${extraRows}` : ''}
+    `;
   }
 
   function renderRoom(room) {
@@ -797,7 +893,7 @@
   function renderPanels() {
     statusPanelNode.innerHTML = renderStatus(gmcpState.char.status || {});
     vitalsNode.innerHTML = renderVitals(gmcpState.char.vitals || {});
-    enemyNode.innerHTML = renderVitals(gmcpState.enemy.vitals || {});
+    enemyNode.innerHTML = renderVitals(gmcpState.enemy.vitals || {}, { enemy: true });
     areaNode.innerHTML = renderArea(gmcpState.area || {});
     roomNode.innerHTML = renderRoom(gmcpState.room || {});
     communicationNode.innerHTML = renderCommunication(gmcpState.communication || {});

@@ -232,6 +232,63 @@
       font-size: 13px;
     }
 
+    .status-header {
+      display: grid;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+
+    .status-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e6f1ff;
+      letter-spacing: 0.02em;
+    }
+
+    .status-sub {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .status-line {
+      margin-bottom: 10px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: rgba(122, 162, 255, 0.12);
+      color: #c7d9ff;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px 12px;
+    }
+
+    .status-key {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 10px;
+    }
+
+    .status-value {
+      text-align: right;
+      color: #cfe3ff;
+      font-variant-numeric: tabular-nums;
+      font-size: 12px;
+    }
+
+    .status-divider {
+      height: 1px;
+      margin: 10px 0;
+      background: rgba(148, 163, 184, 0.2);
+    }
+
     .map-canvas {
       width: 100%;
       height: 100%;
@@ -307,14 +364,6 @@
   </style>
 </head>
 <body>
-  <div class="hud-card hud-draggable" data-hud-key="hp" style="left:12px; top:58px;">
-    <div class="hud-label">HP</div>
-    <div class="hud-value">
-      <span id="hudHpValue">0/0</span>
-      <span id="hudHpPct">0%</span>
-    </div>
-    <div class="hud-bar hp"><span id="hudHpBar"></span></div>
-  </div>
   <div class="hud-card hud-draggable" data-hud-key="sp" style="left:12px; top:140px;">
     <div class="hud-label">SP</div>
     <div class="hud-value">
