@@ -7,6 +7,8 @@ const { WebSocketServer } = require('ws');
 const WS_PORT = Number(process.env.WS_PORT || 8080);
 const DEFAULT_MUD_HOST = process.env.MUD_HOST || 'www.thebigwave.net';
 const DEFAULT_MUD_PORT = Number(process.env.MUD_PORT || 23);
+const MUD_IDLE_TIMEOUT_MS = Number(process.env.MUD_IDLE_TIMEOUT_MS || 0);
+const WS_HEARTBEAT_INTERVAL_MS = Number(process.env.WS_HEARTBEAT_INTERVAL_MS || 30000);
 
 const IAC = 255;
 const DONT = 254;
@@ -142,7 +144,12 @@ function parseGmcp(message) {
 
 function createMudSocket(ws, host, port) {
   const socket = net.createConnection({ host, port });
-  socket.setTimeout(15000);
+  socket.setKeepAlive(true, 30000);
+  if (MUD_IDLE_TIMEOUT_MS > 0) {
+    socket.setTimeout(MUD_IDLE_TIMEOUT_MS);
+  } else {
+    socket.setTimeout(0);
+  }
   let gmcpReady = false;
 
   function sendIac(cmd, opt) {
@@ -221,7 +228,7 @@ function createMudSocket(ws, host, port) {
   });
 
   socket.on('timeout', () => {
-    sendStatus(ws, `Socket timeout to ${host}:${port}`);
+    sendStatus(ws, `Socket idle timeout (${MUD_IDLE_TIMEOUT_MS}ms) to ${host}:${port}`);
     sendEvent(ws, { type: 'disconnect' });
     socket.destroy();
   });
@@ -279,8 +286,32 @@ const server = http.createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ server });
+if (WS_HEARTBEAT_INTERVAL_MS > 0) {
+  // Keep WebSocket sessions alive through proxies and drop stale peers quickly.
+  const heartbeatInterval = setInterval(() => {
+    for (const ws of wss.clients) {
+      if (ws.isAlive === false) {
+        ws.terminate();
+        continue;
+      }
+      ws.isAlive = false;
+      if (ws.readyState === ws.OPEN) {
+        ws.ping();
+      }
+    }
+  }, WS_HEARTBEAT_INTERVAL_MS);
+
+  wss.on('close', () => {
+    clearInterval(heartbeatInterval);
+  });
+}
 
 wss.on('connection', (ws) => {
+  ws.isAlive = true;
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
+
   sendStatus(ws, 'WebSocket connected');
   let mud = null;
 
